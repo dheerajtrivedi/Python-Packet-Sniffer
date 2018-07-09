@@ -13,6 +13,4 @@ class Ethernet:
         self.src_mac = get_mac_addr(src)
         self.proto = socket.htons(prototype)
         self.data = raw_data[14:]
-
-
-
+        self.length = len(raw_data)

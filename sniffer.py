@@ -1,4 +1,5 @@
 import socket
+import time
 from general import *
 from networking.ethernet import Ethernet
 from networking.ipv4 import IPv4
@@ -22,14 +23,15 @@ DATA_TAB_4 = '\t\t\t\t   '
 def main():
     pcap = Pcap('capture.pcap')
     conn = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
-
+    ts1 = time.time()
     while True:
         raw_data, addr = conn.recvfrom(65535)
+        ts2 = time.time()
+        t = ts2-ts1
         pcap.write(raw_data)
         eth = Ethernet(raw_data)
-
         print('\nEthernet Frame:')
-        print(TAB_1 + 'Destination: {}, Source: {}, Protocol: {}'.format(eth.dest_mac, eth.src_mac, eth.proto))
+        print(TAB_1 + 'Destination: {}, Source: {}, Protocol: {}, Length: {}, Time: {}'.format(eth.dest_mac, eth.src_mac, eth.proto, eth.length, t))
 
         # IPv4
         if eth.proto == 8:
