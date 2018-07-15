@@ -56,7 +56,7 @@ class Packet:
                 icmp = ICMP(ipv4.data)
             elif ipv4.proto == 6:
                 self.proto = 'TCP'
-                self.ip_protocol = 'ICMP'
+                self.ip_protocol = 'TCP'
                 tcp = TCP(ipv4.data)
                 self.tcp_dest_port = tcp.src_port
                 self.tcp_src_port = tcp.dest_port

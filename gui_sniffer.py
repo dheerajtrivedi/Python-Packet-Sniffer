@@ -1,22 +1,17 @@
 import socket
 import time
-from networking.ethernet import Ethernet
-from networking.ipv4 import IPv4
-from networking.icmp import ICMP
-from networking.tcp import TCP
-from networking.udp import UDP
-from multiprocessing import Process
 from networking.pcap import Pcap
-from networking.http import HTTP
 from packet import Packet
 
 from tkinter import *
 from tkinter import ttk
+import tkinter.messagebox
 
-
+filter_query_list = ['protocol','ip','dest_ip','src_ip','eth_type','ip_version','ip_protocol','port','dest_port','src_port','dest_mac','src_mac']
 class gui(Frame):
     def __init__(self,root):
         self.psize = 0
+        self.is_filter = False
         self.tstart = time.time()
         root.protocol("WM_DELETE_WINDOW", root.destroy)
         #------------ MENUBAR ----------
@@ -43,6 +38,14 @@ class gui(Frame):
         self.startbutton.pack(side = LEFT, padx = 2)
         self.stopbutton.pack(side = LEFT, padx = 2)
         self.toolbar.pack(side ='top', fill=X)
+
+        #------------ FILTER --------------
+        self.filter_frame = Frame(root)
+        self.filter_entry = Entry(self.filter_frame)
+        self.filter_button = Button(self.filter_frame, text = 'FILTER', command = self.filter)
+        self.filter_entry.pack(side = LEFT, padx = 2)
+        self.filter_button.pack(side = LEFT, padx = 2)
+        self.filter_frame.pack(side = 'top', fill = X)
 
         #------------ TREEVIEW ------------
         self.treeview = ttk.Treeview(root, height = 10, columns = (2,3,4,5,6,7))
@@ -73,6 +76,20 @@ class gui(Frame):
     def stop(self):
         self.stop = 1
         self.statusbar.config(text = 'Stopped.'+ str(self.psize) +' packets captured.')
+    def filter(self):
+        fil_str = self.filter_entry.get().replace(" ","")
+        tmp_filter_list = fil_str.split(',')
+        self.filter_list = {}
+        self.is_filter = True
+        for fil in tmp_filter_list:
+            fil_q = fil.split('=')
+            if fil_q[0] not in filter_query_list:
+                self.is_filter = False
+                tkinter.messagebox.showinfo('Input Error', 'Sorry! ' + fil_q[0] +' is not valid input. Please try again.')
+                print(fil_q[0] + 'is invalid query. Please read help.')
+                break
+            self.filter_list[fil_q[0]] = fil_q[1]
+        print(self.filter_list)
 
     def sniff(self):
         pcap = Pcap('capture.pcap')
@@ -80,17 +97,55 @@ class gui(Frame):
         t = 0
         while(self.stop == 0):
             print(self.psize)
-            self.psize += 1
             raw_data, addr = conn.recvfrom(65535)
             ts2 = time.time()
             t = ts2-self.tstart
             pcap.write(raw_data)
             pack = Packet(raw_data)
-            add = (t,) + pack.getIt()
-            self.treeview.insert('','end',self.psize, text = self.psize, values = add)
+            if(self.is_filter):
+                to_print = True
+                for fil in self.filter_list:
+                    qu = self.filter_list[fil]
+                    print('Checking '+ qu+' in ' + str(pack.ip_protocol))
+                    if fil == 'protocol':
+                        if qu != pack.eth_type and qu != pack.ip_protocol:
+                            to_print = False
+                            break
+                    elif fil == 'ip':
+                        if qu != pack.dest_ip and qu != pack.src_ip:
+                            to_print = False
+                            break
+                    elif fil == 'dest_ip':
+                        if qu != pack.dest_ip:
+                            to_print = False
+                            break
+                    elif fil == 'src_ip':
+                        if qu != pack.src_ip:
+                            to_print = False
+                            break
+                    elif fil == 'ip_protocol':
+                        if qu != pack.ip_protocol:
+                            to_print = False
+                            break
+                    elif fil == 'eth_type':
+                        if qu != pack.eth_type:
+                            to_print = False
+                            break
+
+                if to_print == True:
+                    self.psize += 1
+                    add = (t,) + pack.getIt()
+                    Packets.append(add)
+                    self.treeview.insert('','end',self.psize, text = self.psize, values = add)
+            else:
+                self.psize += 1
+                add = (t,) + pack.getIt()
+                Packets.append(add)
+                self.treeview.insert('','end',self.psize, text = self.psize, values = add)
             self.treeview.update()
 
+Packets = []
 root = Tk()
-root.title('Packet Sniffer 0.2.2')
+root.title('Packet Sniffer 0.2.4')
 hey = gui(root)
 root.mainloop()
