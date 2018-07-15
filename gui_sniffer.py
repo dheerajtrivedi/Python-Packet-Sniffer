@@ -5,6 +5,9 @@ from packet import Packet
 
 from tkinter import *
 from tkinter import ttk
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
 import tkinter.messagebox
 
 filter_query_list = ['protocol','ip','dest_ip','src_ip','eth_type','ip_version','ip_protocol','port','dest_port','src_port','dest_mac','src_mac']
@@ -12,7 +15,6 @@ class gui(Frame):
     def __init__(self,root):
         self.psize = 0
         self.is_filter = False
-        self.tstart = time.time()
         root.protocol("WM_DELETE_WINDOW", root.destroy)
         #------------ MENUBAR ----------
         self.menu = Menu(root)
@@ -35,8 +37,11 @@ class gui(Frame):
         self.stopbutton.config(image=stop_img,compound= LEFT)
         self.stopbutton.image = stop_img
 
+        self.clear_button = Button(self.toolbar, text = 'CLEAR',command = self.clear)
+
         self.startbutton.pack(side = LEFT, padx = 2)
         self.stopbutton.pack(side = LEFT, padx = 2)
+        self.clear_button.pack(side = LEFT, padx = 2)
         self.toolbar.pack(side ='top', fill=X)
 
         #------------ FILTER --------------
@@ -44,9 +49,11 @@ class gui(Frame):
         self.filter_entry = Entry(self.filter_frame)
         self.filter_button = Button(self.filter_frame, text = 'FILTER', command = self.filter)
         self.help_button = Button(self.filter_frame, text = 'Help', command = self.help)
+        self.show_graph_button = Button(self.filter_frame, text = 'Show Graph', command = self.show_graph)
         self.filter_entry.pack(side = LEFT, padx = 2)
         self.filter_button.pack(side = LEFT, padx = 2)
         self.help_button.pack(side = RIGHT, padx = 2)
+        self.show_graph_button.pack(side = LEFT, padx = 2)
         self.filter_frame.pack(side = 'top', fill = X)
 
         #------------ TREEVIEW ------------
@@ -71,6 +78,7 @@ class gui(Frame):
         self.statusbar.pack(side = BOTTOM, fill = X)
 
     def start(self):
+        self.clear()
         self.stop = 0
         self.statusbar.config(text = 'Capturing Packets...')
         self.sniff()
@@ -92,6 +100,8 @@ class gui(Frame):
                 break
             self.filter_list[fil_q[0]] = fil_q[1]
         print(self.filter_list)
+        if(self.is_filter == True):
+            self.start()
     def help(self):
         help_window = Toplevel(root)
         help_window.title('Help')
@@ -104,15 +114,37 @@ class gui(Frame):
         ip_protocol, eth_type.'
         help_label = Label(help_window, text=var,justify = LEFT)
         help_label.pack()
+    def show_graph(self):
+        t = 1
+        ram = np.array(0)
+        val = 0
+        for item in Packets:
+            if(item[0] < t):
+                val+=1
+            else:
+                ram = np.append(ram,[val])
+                val = 1
+                t += 1
+        fig, ax = plt.subplots()
+        ax.plot(ram)
+        ax.set(xlabel='time (s)', ylabel='packets',
+                   title='Network Traffic Graph')
+        ax.grid()
+        plt.show()
+    def clear(self):
+        Packets.clear()
+        self.treeview.delete(*self.treeview.get_children())
+        self.psize = 0
     def sniff(self):
         pcap = Pcap('capture.pcap')
         conn = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
+        ts1=time.time()
         t = 0
         while(self.stop == 0):
             print(self.psize)
             raw_data, addr = conn.recvfrom(65535)
             ts2 = time.time()
-            t = ts2-self.tstart
+            t = ts2-ts1
             pcap.write(raw_data)
             pack = Packet(raw_data)
             if(self.is_filter):
@@ -159,6 +191,6 @@ class gui(Frame):
 
 Packets = []
 root = Tk()
-root.title('Packet Sniffer 0.2.4')
+root.title('Packet Sniffer 0.2.5')
 hey = gui(root)
 root.mainloop()
