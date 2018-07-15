@@ -43,8 +43,10 @@ class gui(Frame):
         self.filter_frame = Frame(root)
         self.filter_entry = Entry(self.filter_frame)
         self.filter_button = Button(self.filter_frame, text = 'FILTER', command = self.filter)
+        self.help_button = Button(self.filter_frame, text = 'Help', command = self.help)
         self.filter_entry.pack(side = LEFT, padx = 2)
         self.filter_button.pack(side = LEFT, padx = 2)
+        self.help_button.pack(side = RIGHT, padx = 2)
         self.filter_frame.pack(side = 'top', fill = X)
 
         #------------ TREEVIEW ------------
@@ -90,7 +92,18 @@ class gui(Frame):
                 break
             self.filter_list[fil_q[0]] = fil_q[1]
         print(self.filter_list)
-
+    def help(self):
+        help_window = Toplevel(root)
+        help_window.title('Help')
+        var = '********************************************\n\
+        To write filter query, add comma seperated \n \
+        request in this format: \n \
+        filter_type=options \n\n \
+        For example: protocol=TCP,desr_ip=10.0.0.5\n\n \
+        filter_type can be: protocol, ip, dest_ip, src_ip, \n \
+        ip_protocol, eth_type.'
+        help_label = Label(help_window, text=var,justify = LEFT)
+        help_label.pack()
     def sniff(self):
         pcap = Pcap('capture.pcap')
         conn = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
