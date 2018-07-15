@@ -15,6 +15,7 @@ class gui(Frame):
     def __init__(self,root):
         self.psize = 0
         self.is_filter = False
+        self.info_var = StringVar()
         root.protocol("WM_DELETE_WINDOW", root.destroy)
         #------------ MENUBAR ----------
         self.menu = Menu(root)
@@ -65,6 +66,7 @@ class gui(Frame):
         self.treeview.heading(5, text = "PROTOCOL")
         self.treeview.heading(6, text = "LENGTH")
         self.treeview.heading(7, text = "INFO")
+        self.treeview.bind('<ButtonRelease-1>', self.show_full)
 
         self.ysb = ttk.Scrollbar(root, orient=VERTICAL, command=self.treeview.yview)
         self.xsb = ttk.Scrollbar(root, orient=HORIZONTAL, command=self.treeview.xview)
@@ -72,6 +74,10 @@ class gui(Frame):
         self.xsb.pack(anchor=S, fill=X, side=BOTTOM)
         self.treeview.pack(expand=True, fill=BOTH)
 
+        #------------- LABEL --------------
+        self.info_label = Label(root, textvariable = self.info_var,bg = 'white', height = 50, justify = LEFT, borderwidth=2, relief="groove", anchor = NW)
+        self.info_label.textvaraible = self.info_var
+        self.info_label.pack(side = BOTTOM, expand = True, fill = X)
 
         #------------ STATUSBAR -------------
         self.statusbar = Label(root,text = "Welcome...", bd = 1, relief = SUNKEN,anchor = W)
@@ -86,6 +92,7 @@ class gui(Frame):
     def stop(self):
         self.stop = 1
         self.statusbar.config(text = 'Stopped.'+ str(self.psize) +' packets captured.')
+
     def filter(self):
         fil_str = self.filter_entry.get().replace(" ","")
         tmp_filter_list = fil_str.split(',')
@@ -99,27 +106,54 @@ class gui(Frame):
                 print(fil_q[0] + 'is invalid query. Please read help.')
                 break
             self.filter_list[fil_q[0]] = fil_q[1]
-        print(self.filter_list)
+        print('Filter Request: ' + str(self.filter_list))
         if(self.is_filter == True):
             self.start()
+
+    def show_full(self,a):
+        cur = self.treeview.focus()
+        print(self.treeview.item(cur))
+        idx = self.treeview.item(cur)['text']
+        pck = Packets[idx-1]
+        dis_str = '\nEthernet Frame:\n'
+        dis_str += 'Destination: {}, Source: {}, EtherType: {}, Length: {}\n\n'.format(pck.dest_mac, pck.src_mac, pck.eth_type, pck.length)
+        if(pck.eth_type == 'IPv4'):
+            dis_str += 'IPv4 Packet:\n'
+            dis_str += 'Version: {}, Header Length: {}, TTL: {},\n'.format(pck.ip_version, pck.ip_header_length, pck.ttl)
+            dis_str += 'Protocol: {}, Source: {}, Target: {}\n\n\n'.format(pck.ip_protocol, pck.src_ip, pck.dest_ip)
+            if pck.ip_protocol == 'ICMP':
+                dis_str += 'ICMP Packet:\n'
+                dis_str += 'Type: {}, Code: {}, Checksum: {},\n\n\n'.format(pck.icmp_type, pck.icmp_code, pck.icmp_checksum)
+            elif pck.ip_protocol == 'TCP':
+                dis_str +='TCP Segment:\n'
+                dis_str +='Source Port: {}, Destination Port: {}\n'.format(pck.src_port, pck.dest_port)
+                dis_str +='Sequence: {}, Acknowledgment: {}\n'.format(pck.tcp_sequence, pck.tcp_ack)
+                dis_str +='Flags:\n'
+                dis_str +='URG: {}, ACK: {}, PSH: {}\n'.format(pck.tcp_flag_urg, pck.tcp_flag_ack, pck.tcp_flag_psh)
+                dis_str +='RST: {}, SYN: {}, FIN:{}\n\n\n'.format(pck.tcp_flag_rst, pck.tcp_flag_syn, pck.tcp_flag_fin)
+            elif pck.ip_protocol == 'UDP':
+                dis_str +='UDP Segment:'
+                dis_str +='Source Port: {}, Destination Port: {}, Length: {}\n\n'.format(pck.src_port, pck.dest_port, pck.udp_size)
+        self.info_var.set(dis_str)
+
     def help(self):
         help_window = Toplevel(root)
         help_window.title('Help')
-        var = '********************************************\n\
+        var = '**********************************************\n\
         To write filter query, add comma seperated \n \
         request in this format: \n \
         filter_type=options \n\n \
         For example: protocol=TCP,desr_ip=10.0.0.5\n\n \
         filter_type can be: protocol, ip, dest_ip, src_ip, \n \
         ip_protocol, eth_type.'
-        help_label = Label(help_window, text=var,justify = LEFT)
+        help_label = Label(help_window, text=var,justify = LEFT, anchor = NW)
         help_label.pack()
     def show_graph(self):
         t = 1
         ram = np.array(0)
         val = 0
-        for item in Packets:
-            if(item[0] < t):
+        for tic in tcounts:
+            if(tic < t):
                 val+=1
             else:
                 ram = np.append(ram,[val])
@@ -131,17 +165,19 @@ class gui(Frame):
                    title='Network Traffic Graph')
         ax.grid()
         plt.show()
+
     def clear(self):
         Packets.clear()
+        tcounts.clear()
         self.treeview.delete(*self.treeview.get_children())
         self.psize = 0
+
     def sniff(self):
         pcap = Pcap('capture.pcap')
         conn = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
         ts1=time.time()
         t = 0
         while(self.stop == 0):
-            print(self.psize)
             raw_data, addr = conn.recvfrom(65535)
             ts2 = time.time()
             t = ts2-ts1
@@ -151,7 +187,6 @@ class gui(Frame):
                 to_print = True
                 for fil in self.filter_list:
                     qu = self.filter_list[fil]
-                    print('Checking '+ qu+' in ' + str(pack.ip_protocol))
                     if fil == 'protocol':
                         if qu != pack.eth_type and qu != pack.ip_protocol:
                             to_print = False
@@ -180,17 +215,19 @@ class gui(Frame):
                 if to_print == True:
                     self.psize += 1
                     add = (t,) + pack.getIt()
-                    Packets.append(add)
+                    Packets.append(pack)
                     self.treeview.insert('','end',self.psize, text = self.psize, values = add)
             else:
                 self.psize += 1
                 add = (t,) + pack.getIt()
-                Packets.append(add)
+                tcounts.append(t)
+                Packets.append(pack)
                 self.treeview.insert('','end',self.psize, text = self.psize, values = add)
             self.treeview.update()
 
 Packets = []
+tcounts = []
 root = Tk()
-root.title('Packet Sniffer 0.2.5')
+root.title('Packet Sniffer 0.2.6')
 hey = gui(root)
 root.mainloop()
