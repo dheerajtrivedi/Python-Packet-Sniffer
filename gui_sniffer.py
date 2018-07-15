@@ -8,6 +8,7 @@ from networking.udp import UDP
 from multiprocessing import Process
 from networking.pcap import Pcap
 from networking.http import HTTP
+from packet import Packet
 
 from tkinter import *
 from tkinter import ttk
@@ -53,9 +54,13 @@ class gui(Frame):
         self.treeview.heading(6, text = "LENGTH")
         self.treeview.heading(7, text = "INFO")
 
-        self.scrollbar = Scrollbar(root)
-        self.scrollbar.pack( side = RIGHT, fill=Y )
-        self.treeview.pack()
+        self.ysb = ttk.Scrollbar(root, orient=VERTICAL, command=self.treeview.yview)
+        self.xsb = ttk.Scrollbar(root, orient=HORIZONTAL, command=self.treeview.xview)
+        self.ysb.pack(anchor=E, fill=Y, side=RIGHT)
+        self.xsb.pack(anchor=S, fill=X, side=BOTTOM)
+        self.treeview.pack(expand=True, fill=BOTH)
+
+
         #------------ STATUSBAR -------------
         self.statusbar = Label(root,text = "Welcome...", bd = 1, relief = SUNKEN,anchor = W)
         self.statusbar.pack(side = BOTTOM, fill = X)
@@ -73,7 +78,6 @@ class gui(Frame):
         pcap = Pcap('capture.pcap')
         conn = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.ntohs(3))
         t = 0
-        Packets = []
         while(self.stop == 0):
             print(self.psize)
             self.psize += 1
@@ -81,31 +85,11 @@ class gui(Frame):
             ts2 = time.time()
             t = ts2-self.tstart
             pcap.write(raw_data)
-            eth = Ethernet(raw_data)
-            self.dest = eth.dest_mac
-            self.src = eth.src_mac
-            self.proto = 'Ethernet II'
-            self.length = eth.length
-            self.info = '-'
-            if eth.proto == 8:
-                ipv4 = IPv4(eth.data)
-                self.dest = ipv4.target
-                self.src = ipv4.src
-                self.proto = 'IPv4'
-                if ipv4.proto == 1:
-                    self.proto = 'ICMP'
-                    icmp = ICMP(ipv4.data)
-                elif ipv4.proto == 6:
-                    self.proto = 'TCP'
-                    tcp = TCP(ipv4.data)
-                elif ipv4.proto == 14:
-                    self.proto = 'UDP'
-                    udp = UDP(ipv4.data)
-
-
-            Packets.append((t,self.dest,self.src,self.proto,self.length,self.info))
-            self.treeview.insert('','end',self.psize, text = self.psize, values = Packets[-1])
+            pack = Packet(raw_data)
+            add = (t,) + pack.getIt()
+            self.treeview.insert('','end',self.psize, text = self.psize, values = add)
             self.treeview.update()
+
 root = Tk()
 root.title('Packet Sniffer 0.2.2')
 hey = gui(root)
